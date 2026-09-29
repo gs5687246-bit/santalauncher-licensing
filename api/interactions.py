@@ -14,8 +14,14 @@ def _verify_sig(request, body):
     Usa pynacl se disponivel; sem PUBLIC_KEY configurada (dev), aceita."""
     if not PUBLIC_KEY:
         return True
-    sig = request.headers.get("x-signature-ed25519", "")
-    ts = request.headers.get("x-signature-timestamp", "")
+    def _hdr(name):
+        h = getattr(request, "headers", None) or {}
+        try:
+            return h.get(name) or h.get(name.upper()) or h.get(name.title()) or ""
+        except Exception:
+            return ""
+    sig = _hdr("x-signature-ed25519")
+    ts = _hdr("x-signature-timestamp")
     if not sig or not ts:
         return False
     try:
@@ -62,7 +68,9 @@ def _register_commands():
         pass
 
 def handler(request):
-    body = request.body or b""
+    body = getattr(request, "body", None) or b""
+    if isinstance(body, str):
+        body = body.encode()
     if not _verify_sig(request, body):
         return ("{\"error\":\"bad signature\"}", 401,
                 {"Content-Type": "application/json"})
