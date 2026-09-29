@@ -202,6 +202,16 @@ async def debug():
         "kv": bool(os.environ.get("KV_REST_API_URL")),
         "commands": None,
     }
+    if BOT_TOKEN:
+        try:
+            req = urllib.request.Request("https://discord.com/api/v10/users/@me",
+                headers={"Authorization": f"Bot {BOT_TOKEN}"})
+            with urllib.request.urlopen(req, timeout=10) as x:
+                me = json.loads(x.read().decode())
+            st["token_app_id"] = me.get("id")
+            st["token_bot_name"] = me.get("username")
+        except Exception as e:
+            st["token_app_id"] = f"erro: {e!r}"[:120]
     if BOT_TOKEN and APP_ID_ENV:
         try:
             req = urllib.request.Request(
