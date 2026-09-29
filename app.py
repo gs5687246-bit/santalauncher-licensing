@@ -190,3 +190,25 @@ async def interactions(request: Request):
         return _reply(f"✅ `{did}` — ativa até {exps} | HWID: `{hw[:18]}…`")
 
     return _reply("Comando desconhecido.", eph=True)
+
+@app.get("/api/debug")
+async def debug():
+    """Diagnóstico: estado das env vars e dos comandos (sem expor segredos)."""
+    st = {
+        "public_key": bool(PUBLIC_KEY),
+        "bot_token": bool(BOT_TOKEN),
+        "application_id": bool(APP_ID_ENV),
+        "kv": bool(os.environ.get("KV_REST_API_URL")),
+        "commands": None,
+    }
+    if BOT_TOKEN and APP_ID_ENV:
+        try:
+            req = urllib.request.Request(
+                f"https://discord.com/api/v10/applications/{APP_ID_ENV}/commands",
+                headers={"Authorization": f"Bot {BOT_TOKEN}"})
+            with urllib.request.urlopen(req, timeout=10) as x:
+                cmds = json.loads(x.read().decode())
+            st["commands"] = [c["name"] for c in cmds]
+        except Exception as e:
+            st["commands"] = f"erro: {e!r}"[:120]
+    return J(st)
