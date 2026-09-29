@@ -195,15 +195,39 @@ async def interactions(request: Request):
     return _reply("Comando desconhecido.", eph=True)
 
 @app.get("/api/debug")
-async def debug():
+async def debug(register: int = 0):
     """Diagnóstico: estado das env vars e dos comandos (sem expor segredos)."""
+    reg_status = None
+    if register and BOT_TOKEN and APP_ID_ENV:
+        try:
+            _register_commands()
+            reg_status = "registrado (ou já existia)"
+        except Exception as e:
+            reg_status = f"erro: {e!r}"[:120]
+    return J({**{k: v for k, v in {
+        "public_key": bool(PUBLIC_KEY), "bot_token": bool(BOT_TOKEN),
+        "application_id_set": bool(APP_ID_ENV),
+        "application_id": APP_ID_ENV or None, "kv": bool(os.environ.get("KV_REST_API_URL")),
+        "reg_status": reg_status}.items()},
+        "commands": _list_commands()})
+
+def _list_commands():
+    if not (BOT_TOKEN and APP_ID_ENV):
+        return None
+    try:
+        req = urllib.request.Request(
+            f"https://discord.com/api/v10/applications/{APP_ID_ENV}/commands",
+            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=10) as x:
+            return [c["name"] for c in json.loads(x.read().decode())]
+    except Exception as e:
+        return f"erro: {e!r}"[:120]
     st = {
         "public_key": bool(PUBLIC_KEY),
         "bot_token": bool(BOT_TOKEN),
         "application_id_set": bool(APP_ID_ENV),
         "application_id": APP_ID_ENV or None,
         "kv": bool(os.environ.get("KV_REST_API_URL")),
-        "commands": None,
     }
     if BOT_TOKEN:
         st["token_shape"] = {"len": len(BOT_TOKEN),
@@ -221,14 +245,4 @@ async def debug():
             st["token_bot_name"] = me.get("username")
         except Exception as e:
             st["token_app_id"] = f"erro: {e!r}"[:120]
-    if BOT_TOKEN and APP_ID_ENV:
-        try:
-            req = urllib.request.Request(
-                f"https://discord.com/api/v10/applications/{APP_ID_ENV}/commands",
-                headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=10) as x:
-                cmds = json.loads(x.read().decode())
-            st["commands"] = [c["name"] for c in cmds]
-        except Exception as e:
-            st["commands"] = f"erro: {e!r}"[:120]
     return J(st)
