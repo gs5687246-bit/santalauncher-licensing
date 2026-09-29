@@ -2,8 +2,10 @@
 # Env vars: KV_REST_API_URL, KV_REST_API_TOKEN (criadas ao adicionar Vercel KV).
 import json, os, time, urllib.request, urllib.error
 
-_URL = os.environ.get("KV_REST_API_URL", "").rstrip("/")
-_TOKEN = os.environ.get("KV_REST_API_TOKEN", "")
+_URL = (os.environ.get("KV_REST_API_URL")
+        or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
+_TOKEN = (os.environ.get("KV_REST_API_TOKEN")
+          or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or "")
 _KEY = "licencas"   # hash: campo = discord_id, valor = json da licenca
 
 def _rest(*parts):
