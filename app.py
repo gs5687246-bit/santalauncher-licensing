@@ -2,7 +2,7 @@
 # Discord Interactions) — FastAPI, entrypoint único da Vercel.
 import json, os, sys, time, base64, urllib.request
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SantaLauncherLicensing/1.0"
+UA = "Mozilla/5.0 (compatible, DiscordBot)"
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import kv
