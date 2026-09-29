@@ -2,6 +2,8 @@
 # Discord Interactions) — FastAPI, entrypoint único da Vercel.
 import json, os, sys, time, base64, urllib.request
 
+UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) SantaLauncherLicensing/1.0"
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import kv
 from lib import zeroauth as za
@@ -120,7 +122,8 @@ def _register_commands():
     ]
     url = f"https://discord.com/api/v10/applications/{APP_ID_ENV}/commands"
     req = urllib.request.Request(url, method="PUT", data=json.dumps(cmds).encode(),
-        headers={"Authorization": f"Bot {BOT_TOKEN}", "Content-Type": "application/json"})
+        headers={"Authorization": f"Bot {BOT_TOKEN}", "Content-Type": "application/json",
+                 "User-Agent": UA})
     try:
         urllib.request.urlopen(req, timeout=8)
     except Exception:
@@ -211,7 +214,7 @@ async def debug():
                              "comeca_bot_": BOT_TOKEN.startswith("Bot ")}
         try:
             req = urllib.request.Request("https://discord.com/api/v10/users/@me",
-                headers={"Authorization": f"Bot {BOT_TOKEN.strip()}"})
+                headers={"Authorization": f"Bot {BOT_TOKEN.strip()}", "User-Agent": UA})
             with urllib.request.urlopen(req, timeout=10) as x:
                 me = json.loads(x.read().decode())
             st["token_app_id"] = me.get("id")
@@ -222,7 +225,7 @@ async def debug():
         try:
             req = urllib.request.Request(
                 f"https://discord.com/api/v10/applications/{APP_ID_ENV}/commands",
-                headers={"Authorization": f"Bot {BOT_TOKEN}"})
+                headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
             with urllib.request.urlopen(req, timeout=10) as x:
                 cmds = json.loads(x.read().decode())
             st["commands"] = [c["name"] for c in cmds]
