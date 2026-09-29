@@ -1,14 +1,28 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "api/**/*.py", "use": "@vercel/python" }
-  ],
-  "routes": [
-    { "src": "/api/auth-api/health", "dest": "/api/health" },
-    { "src": "/api/auth-api/check-app-status", "dest": "/api/check-app-status" },
-    { "src": "/api/auth-api/login", "dest": "/api/login" },
-    { "src": "/api/auth-api/log-login", "dest": "/api/log-login" },
-    { "src": "/api/auth-api/get-expiration", "dest": "/api/get-expiration" },
-    { "src": "/api/interactions", "dest": "/api/interactions" }
+  "rewrites": [
+    {
+      "source": "/api/auth-api/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/api/auth-api/check-app-status",
+      "destination": "/api/check-app-status"
+    },
+    {
+      "source": "/api/auth-api/login",
+      "destination": "/api/login"
+    },
+    {
+      "source": "/api/auth-api/log-login",
+      "destination": "/api/log-login"
+    },
+    {
+      "source": "/api/auth-api/get-expiration",
+      "destination": "/api/get-expiration"
+    },
+    {
+      "source": "/api/interactions",
+      "destination": "/api/interactions"
+    }
   ]
 }
