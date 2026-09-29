@@ -203,9 +203,15 @@ async def debug():
         "commands": None,
     }
     if BOT_TOKEN:
+        st["token_shape"] = {"len": len(BOT_TOKEN),
+                             "prefix": BOT_TOKEN[:6],
+                             "sufix": BOT_TOKEN[-4:],
+                             "tem_espaco": (" " in BOT_TOKEN.strip()),
+                             "tem_quebra": ("\n" in BOT_TOKEN or "\r" in BOT_TOKEN),
+                             "comeca_bot_": BOT_TOKEN.startswith("Bot ")}
         try:
             req = urllib.request.Request("https://discord.com/api/v10/users/@me",
-                headers={"Authorization": f"Bot {BOT_TOKEN}"})
+                headers={"Authorization": f"Bot {BOT_TOKEN.strip()}"})
             with urllib.request.urlopen(req, timeout=10) as x:
                 me = json.loads(x.read().decode())
             st["token_app_id"] = me.get("id")
