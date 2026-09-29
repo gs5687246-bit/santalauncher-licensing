@@ -1,5 +1,8 @@
-# api/health.py - GET /api/health?appDatabase=...
-from ._auth import handler
+# health - /api/auth-api/health
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def handler_v(request):
-    return handler(request, "health")
+from lib.authapi import Req, handle
+
+def handler(request):
+    return handle(Req(request), "health")
