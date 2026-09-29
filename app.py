@@ -197,7 +197,8 @@ async def debug():
     st = {
         "public_key": bool(PUBLIC_KEY),
         "bot_token": bool(BOT_TOKEN),
-        "application_id": bool(APP_ID_ENV),
+        "application_id_set": bool(APP_ID_ENV),
+        "application_id": APP_ID_ENV or None,
         "kv": bool(os.environ.get("KV_REST_API_URL")),
         "commands": None,
     }
