@@ -225,6 +225,44 @@ def _handle_command(data):
 
     return _reply("Comando desconhecido.", eph=True)
 
+@app.get("/api/avatar")
+async def avatar(did: str = ""):
+    """Avatar Discord do usuario em RGBA cru 64x64 (o launcher nao tem
+    decoder de imagem). Resolve o avatar via API do bot; sem foto,
+    usa o avatar default do Discord (indice did%6)."""
+    did = "".join(ch for ch in did if ch.isdigit())[:20]
+    if not did or not BOT_TOKEN:
+        return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
+    png_bytes = None
+    try:
+        req = urllib.request.Request(
+            f"https://discord.com/api/v10/users/{did}",
+            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=8) as x:
+            u = json.loads(x.read().decode())
+        ah = u.get("avatar")
+        if ah:
+            ext = "gif" if ah.startswith("a_") else "png"
+            url = f"https://cdn.discordapp.com/avatars/{did}/{ah}.{ext}?size=64"
+        else:
+            idx = int(did) % 6
+            url = f"https://cdn.discordapp.com/embed/avatars/{idx}.png"
+        req2 = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req2, timeout=8) as x:
+            png_bytes = x.read()
+    except Exception:
+        png_bytes = None
+    if not png_bytes:
+        return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
+    try:
+        import io as _io
+        from PIL import Image as _Img
+        im = _Img.open(_io.BytesIO(png_bytes)).convert("RGBA")
+        im = im.resize((64, 64))
+        return Response(content=im.tobytes(), media_type="application/octet-stream")
+    except Exception:
+        return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
+
 @app.get("/api/debug")
 async def debug(register: int = 0):
     """Diagnóstico: estado das env vars e dos comandos (sem expor segredos)."""
