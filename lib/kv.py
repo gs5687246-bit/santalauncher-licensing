@@ -1,6 +1,6 @@
 # lib/kv.py - Storage de licencas via Vercel KV (Upstash REST) — sem SDK.
 # Env vars: KV_REST_API_URL, KV_REST_API_TOKEN (criadas ao adicionar Vercel KV).
-import json, os, time, urllib.request, urllib.error
+import json, os, time, urllib.request, urllib.error, urllib.parse
 
 _URL = (os.environ.get("KV_REST_API_URL")
         or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
@@ -9,8 +9,11 @@ _TOKEN = (os.environ.get("KV_REST_API_TOKEN")
 _KEY = "licencas"   # hash: campo = discord_id, valor = json da licenca
 
 def _rest(*parts):
-    """GET/POST Upstash REST: /get/key, /set/key/value, /hset..."""
-    url = _URL + "/" + "/".join(parts)
+    """GET/POST Upstash REST: /get/key, /set/key/value, /hset...
+    Path segments sao URL-encodados (o valor do SET contem espacos,
+    aspas e chaves — sem encode a URL e rejeitada: InvalidURL)."""
+    path = "/".join(urllib.parse.quote(str(p), safe="") for p in parts)
+    url = _URL + "/" + path
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {_TOKEN}"})
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
