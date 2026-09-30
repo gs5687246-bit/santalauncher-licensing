@@ -81,22 +81,40 @@ PUBLIC_KEY = os.environ.get("DISCORD_PUBLIC_KEY", "")
 BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 APP_ID_ENV = os.environ.get("DISCORD_APPLICATION_ID", "")
 
+# Diagnostico da ultima interacao (visivel em /api/debug):
+_last_sig_err = {"erro": None, "ts": None}
+
+def _sig_fail(msg):
+    _last_sig_err["erro"] = msg
+    import time as _t
+    _last_sig_err["ts"] = _t.strftime("%d/%m %H:%M:%S")
+    return False
+
 def _verify_sig(request: Request, body: bytes) -> bool:
     if not PUBLIC_KEY:
         return True  # dev sem key configurada
     sig = request.headers.get("x-signature-ed25519", "")
     ts = request.headers.get("x-signature-timestamp", "")
     if not sig or not ts:
-        return False
+        return _sig_fail("cabecalhos de assinatura ausentes")
     try:
+        key_hex = "".join(PUBLIC_KEY.split())
+        try:
+            key_bytes = bytes.fromhex(key_hex)
+        except Exception as e:
+            return _sig_fail("PUBLIC_KEY nao e hex valido: %r" % e)
+        if len(key_bytes) != 32:
+            return _sig_fail("PUBLIC_KEY tem %d bytes (esperado 32)" % len(key_bytes))
         from nacl.signing import VerifyKey
         from nacl.exceptions import BadSignatureError
-        VerifyKey(bytes.fromhex(PUBLIC_KEY)).verify(ts.encode() + body, bytes.fromhex(sig))
+        VerifyKey(key_bytes).verify(ts.encode() + body, bytes.fromhex(sig))
         return True
     except BadSignatureError:
-        return False
-    except Exception:
-        return False
+        return _sig_fail("assinatura invalida (key errada ou body alterado)")
+    except ImportError as e:
+        return _sig_fail("pynacl ausente no deploy: %r" % e)
+    except Exception as e:
+        return _sig_fail("erro validando: %r" % e)
 
 def _is_admin(member):
     perms = int((member or {}).get("permissions", "0") or 0)
@@ -135,12 +153,25 @@ async def interactions(request: Request):
     if not _verify_sig(request, body):
         return Response(content='{"error":"bad signature"}', status_code=401,
                         media_type="application/json")
-    data = json.loads(body.decode("utf-8", "replace") or "{}")
+    try:
+        data = json.loads(body.decode("utf-8", "replace") or "{}")
+    except Exception as e:
+        _sig_fail("body nao e JSON: %r" % e)
+        return Response(content='{"error":"bad json"}', status_code=400,
+                        media_type="application/json")
     if data.get("type") == 1:            # PING
         _register_commands()
         return {"type": 1}
     if data.get("type") != 2:
         return {"type": 5}
+    try:
+        return _handle_command(data)
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()[-600:]
+        return _reply("Erro interno: `%r`\n```%s```" % (e, tb), eph=True)
+
+def _handle_command(data):
     name = data["data"]["name"]
     opts = {o["name"]: o.get("value") for o in data["data"].get("options", [])}
     member = data.get("member") or {}
@@ -204,12 +235,38 @@ async def debug(register: int = 0):
             reg_status = "registrado (ou já existia)"
         except Exception as e:
             reg_status = f"erro: {e!r}"[:120]
+    key_match = None
+    key_shape = None
+    if BOT_TOKEN and APP_ID_ENV:
+        try:
+            req = urllib.request.Request(
+                f"https://discord.com/api/v10/applications/{APP_ID_ENV}/rpc",
+                headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=10) as x:
+                real = json.loads(x.read().decode()).get("verify_key", "")
+            key_match = ("".join(PUBLIC_KEY.split()).lower() == real.lower()) if PUBLIC_KEY else None
+            if PUBLIC_KEY:
+                pk = "".join(PUBLIC_KEY.split())
+                key_shape = {"len": len(pk), "hex_valido": _hex_ok(pk),
+                             "primeiros8": pk[:8], "ultimos8": pk[-8:]}
+        except Exception as e:
+            key_match = "erro: %r" % e
     return J({**{k: v for k, v in {
         "public_key": bool(PUBLIC_KEY), "bot_token": bool(BOT_TOKEN),
         "application_id_set": bool(APP_ID_ENV),
         "application_id": APP_ID_ENV or None, "kv": bool(os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL")),
-        "reg_status": reg_status}.items()},
+        "reg_status": reg_status,
+        "public_key_bate_com_app": key_match,
+        "public_key_shape": key_shape,
+        "ultima_falha_assinatura": _last_sig_err}.items()},
         "commands": _list_commands()})
+
+def _hex_ok(s):
+    try:
+        b = bytes.fromhex("".join(s.split()))
+        return len(b) == 32
+    except Exception:
+        return False
 
 def _list_commands():
     if not (BOT_TOKEN and APP_ID_ENV):
