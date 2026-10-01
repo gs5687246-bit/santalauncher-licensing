@@ -267,14 +267,17 @@ def _handle_command(data):
     return _reply("Comando desconhecido.", eph=True)
 
 @app.get("/api/avatar")
-async def avatar(did: str = ""):
+async def avatar(did: str = "", debug: str = ""):
     """Avatar Discord do usuario em RGBA cru 64x64 (o launcher nao tem
     decoder de imagem). Resolve o avatar via API do bot; sem foto,
     usa o avatar default do Discord (indice did%6)."""
     did = "".join(ch for ch in did if ch.isdigit())[:20]
     if not did or not BOT_TOKEN:
+        if debug:
+            return Response(content="no_did_or_token", media_type="text/plain")
         return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
     png_bytes = None
+    err = ""
     try:
         req = urllib.request.Request(
             f"https://discord.com/api/v10/users/{did}",
@@ -291,17 +294,24 @@ async def avatar(did: str = ""):
         req2 = urllib.request.Request(url, headers={"User-Agent": UA})
         with urllib.request.urlopen(req2, timeout=8) as x:
             png_bytes = x.read()
-    except Exception:
+    except Exception as e:
         png_bytes = None
+        err = f"fetch: {type(e).__name__}: {e}"
     if not png_bytes:
+        if debug:
+            return Response(content=err or "no_png", media_type="text/plain")
         return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
     try:
         import io as _io
         from PIL import Image as _Img
         im = _Img.open(_io.BytesIO(png_bytes)).convert("RGBA")
         im = im.resize((64, 64))
+        if debug:
+            return Response(content=f"ok ah_bytes={len(png_bytes)}", media_type="text/plain")
         return Response(content=im.tobytes(), media_type="application/octet-stream")
-    except Exception:
+    except Exception as e:
+        if debug:
+            return Response(content=f"pil: {type(e).__name__}: {e}", media_type="text/plain")
         return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
 
 GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1550988093681704991")
