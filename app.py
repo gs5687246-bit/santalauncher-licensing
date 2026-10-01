@@ -263,6 +263,23 @@ async def avatar(did: str = ""):
     except Exception:
         return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
 
+@app.get("/api/username")
+async def username(did: str = ""):
+    """Username Discord do usuario (o launcher mostra no bem-vindo)."""
+    did = "".join(ch for ch in did if ch.isdigit())[:20]
+    if not did or not BOT_TOKEN:
+        return Response(content=did.encode(), media_type="text/plain")
+    try:
+        req = urllib.request.Request(
+            f"https://discord.com/api/v10/users/{did}",
+            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=8) as x:
+            u = json.loads(x.read().decode())
+        name = u.get("global_name") or u.get("username") or did
+        return Response(content=name.encode(), media_type="text/plain")
+    except Exception:
+        return Response(content=did.encode(), media_type="text/plain")
+
 @app.get("/api/debug")
 async def debug(register: int = 0):
     """Diagnóstico: estado das env vars e dos comandos (sem expor segredos)."""
