@@ -53,7 +53,21 @@ async def login(request: Request):
     if salvo and salvo != hwid:
         return J({"message": "HWID mismatch!"}, 403)
     kv.set_lic(key, {**lic, "hwid": hwid, "last_login": time.time()})
-    return J(*_pair(za.r_login(body, lic)))
+    resp = za.r_login(body, lic)
+    # bem-vindo com username Discord real (o ORI mostra o nome da conta):
+    try:
+        if key.isdigit() and BOT_TOKEN:
+            _req = urllib.request.Request(
+                f"https://discord.com/api/v10/users/{key}",
+                headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+            with urllib.request.urlopen(_req, timeout=6) as _x:
+                _u = json.loads(_x.read().decode())
+            _name = _u.get("username") or _u.get("global_name")
+            if _name and isinstance(resp, (list, tuple)) and isinstance(resp[0], dict):
+                resp[0]["usernameOrKey"] = _name
+    except Exception:
+        pass
+    return J(*_pair(resp))
 
 @app.post("/api/auth-api/log-login")
 async def log_login(request: Request):
