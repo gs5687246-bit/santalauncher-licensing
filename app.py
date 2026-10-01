@@ -279,11 +279,19 @@ async def avatar(did: str = "", debug: str = ""):
     png_bytes = None
     err = ""
     try:
-        req = urllib.request.Request(
-            f"https://discord.com/api/v10/users/{did}",
-            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=8) as x:
-            u = json.loads(x.read().decode())
+        # retry 3x (cold start do Vercel + API do Discord falham 1x
+        # as vezes — o launcher mostra avatar vazio se a rota falhar)
+        u = None
+        for _t in range(3):
+            try:
+                req = urllib.request.Request(
+                    f"https://discord.com/api/v10/users/{did}",
+                    headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+                with urllib.request.urlopen(req, timeout=8) as x:
+                    u = json.loads(x.read().decode())
+                break
+            except Exception:
+                if _t == 2: raise
         ah = u.get("avatar")
         if ah:
             ext = "gif" if ah.startswith("a_") else "png"
@@ -291,9 +299,14 @@ async def avatar(did: str = "", debug: str = ""):
         else:
             idx = int(did) % 6
             url = f"https://cdn.discordapp.com/embed/avatars/{idx}.png"
-        req2 = urllib.request.Request(url, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req2, timeout=8) as x:
-            png_bytes = x.read()
+        for _t in range(3):
+            try:
+                req2 = urllib.request.Request(url, headers={"User-Agent": UA})
+                with urllib.request.urlopen(req2, timeout=8) as x:
+                    png_bytes = x.read()
+                break
+            except Exception:
+                if _t == 2: raise
     except Exception as e:
         png_bytes = None
         err = f"fetch: {type(e).__name__}: {e}"
