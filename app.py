@@ -294,6 +294,23 @@ async def username(did: str = ""):
     except Exception:
         return Response(content=did.encode(), media_type="text/plain")
 
+@app.get("/api/whoami")
+async def whoami(did: str = ""):
+    """Debug: username e global_name da conta (texto: username|global_name)."""
+    did = "".join(ch for ch in did if ch.isdigit())[:20]
+    if not did or not BOT_TOKEN:
+        return Response(content="||", media_type="text/plain")
+    try:
+        req = urllib.request.Request(
+            f"https://discord.com/api/v10/users/{did}",
+            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=8) as x:
+            u = json.loads(x.read().decode())
+        return Response(content=f'{u.get("username","")}|{u.get("global_name","")}'.encode(),
+                        media_type="text/plain")
+    except Exception as e:
+        return Response(content=f"ERR|{e}".encode()[:80], media_type="text/plain")
+
 @app.get("/api/debug")
 async def debug(register: int = 0):
     """Diagnóstico: estado das env vars e dos comandos (sem expor segredos)."""
