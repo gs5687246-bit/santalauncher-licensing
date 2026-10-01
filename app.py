@@ -275,7 +275,7 @@ async def username(did: str = ""):
             headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
         with urllib.request.urlopen(req, timeout=8) as x:
             u = json.loads(x.read().decode())
-        name = u.get("global_name") or u.get("username") or did
+        name = u.get("username") or u.get("global_name") or did
         return Response(content=name.encode(), media_type="text/plain")
     except Exception:
         return Response(content=did.encode(), media_type="text/plain")
