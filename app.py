@@ -311,6 +311,21 @@ async def whoami(did: str = ""):
     except Exception as e:
         return Response(content=f"ERR|{e}".encode()[:80], media_type="text/plain")
 
+@app.get("/api/guilds")
+async def guilds():
+    """Debug: servidores onde o bot está (ids + nomes)."""
+    if not BOT_TOKEN:
+        return J({"guilds": []})
+    try:
+        req = urllib.request.Request(
+            "https://discord.com/api/v10/users/@me/guilds?with_counts=false",
+            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=8) as x:
+            gs = json.loads(x.read().decode())
+        return J({"guilds": [{"id": g.get("id"), "name": g.get("name")} for g in gs]})
+    except Exception as e:
+        return J({"erro": repr(e)[:200]})
+
 @app.get("/api/debug")
 async def debug(register: int = 0):
     """Diagnóstico: estado das env vars e dos comandos (sem expor segredos)."""
