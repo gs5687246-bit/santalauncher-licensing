@@ -151,6 +151,10 @@ def _register_commands():
         {"name": "status", "description": "Status de uma licença",
          "options": [{"name": "discord_id", "description": "ID do Discord", "type": 3, "required": True}]},
         {"name": "pingbot", "description": "Testa a API de licenças"},
+        {"name": "nome", "description": "Define o nome exibido no launcher",
+         "options": [
+            {"name": "discord_id", "description": "ID do Discord", "type": 3, "required": True},
+            {"name": "nome", "description": "Nome a exibir", "type": 3, "required": True}]},
     ]
     url = f"https://discord.com/api/v10/applications/{APP_ID_ENV}/commands"
     req = urllib.request.Request(url, method="PUT", data=json.dumps(cmds).encode(),
@@ -201,10 +205,24 @@ def _handle_command(data):
         if not did:
             return _reply("Uso: `/add discord_id:123 dias:30`", eph=True)
         dias = int(opts.get("dias") or 0)
+        # nome de exibicao (mostrado no bem-vindo do launcher):
+        nome = None
+        try:
+            req = urllib.request.Request(
+                f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{did}",
+                headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=8) as x:
+                m = json.loads(x.read().decode())
+            nome = m.get("nick") or (m.get("user") or {}).get("global_name") \
+                   or (m.get("user") or {}).get("username")
+        except Exception:
+            nome = None
+        lic_prev = kv.get_lic(did) or {}
         kv.set_lic(did, {
             "ativa": True,
             "expira": 0 if dias <= 0 else time.time() + dias * 86400,
             "criada_por": user, "criada_em": time.time(), "hwid": "",
+            "nome": lic_prev.get("nome") or nome or user,
         })
         return _reply(f"✅ Licença adicionada para `{did}`"
                       + (f" ({dias} dias)" if dias > 0 else " (vitalícia)"))
@@ -236,6 +254,15 @@ def _handle_command(data):
         exps = "vitalícia" if not exp else time.strftime("%d/%m/%Y %H:%M", time.gmtime(exp))
         hw = lic.get("hwid") or "livre"
         return _reply(f"✅ `{did}` — ativa até {exps} | HWID: `{hw[:18]}…`")
+
+    if name == "nome":
+        if not did or not opts.get("nome"):
+            return _reply("Uso: `/nome discord_id:123 nome:NovoNome`", eph=True)
+        lic = kv.get_lic(did) or {}
+        if not lic:
+            return _reply(f"⚠️ `{did}` não tem licença. Use /add primeiro.", eph=True)
+        kv.set_lic(did, {**lic, "nome": str(opts.get("nome"))[:32]})
+        return _reply(f"✅ Nome de exibição de `{did}` = **{opts.get('nome')}**")
 
     return _reply("Comando desconhecido.", eph=True)
 
@@ -287,7 +314,12 @@ async def username(did: str = ""):
     if not did or not BOT_TOKEN:
         return Response(content=did.encode(), media_type="text/plain")
     name = ""
-    if GUILD_ID:
+    try:
+        lic = kv.get_lic(did) or {}
+        name = lic.get("nome") or ""
+    except Exception:
+        name = ""
+    if not name and GUILD_ID:
         try:
             req = urllib.request.Request(
                 f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{did}",
