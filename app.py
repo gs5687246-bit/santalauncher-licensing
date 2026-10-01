@@ -277,22 +277,37 @@ async def avatar(did: str = ""):
     except Exception:
         return Response(content=b"\x00" * (64 * 64 * 4), media_type="application/octet-stream")
 
+GUILD_ID = os.environ.get("DISCORD_GUILD_ID", "1550988093681704991")
+
 @app.get("/api/username")
 async def username(did: str = ""):
-    """Username Discord do usuario (o launcher mostra no bem-vindo)."""
+    """Nome exibido no bem-vindo: nick/displayName no servidor (igual
+    ORI, ex 'Samulindo'); fallback username Discord; fallback did."""
     did = "".join(ch for ch in did if ch.isdigit())[:20]
     if not did or not BOT_TOKEN:
         return Response(content=did.encode(), media_type="text/plain")
-    try:
-        req = urllib.request.Request(
-            f"https://discord.com/api/v10/users/{did}",
-            headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=8) as x:
-            u = json.loads(x.read().decode())
-        name = u.get("username") or u.get("global_name") or did
-        return Response(content=name.encode(), media_type="text/plain")
-    except Exception:
-        return Response(content=did.encode(), media_type="text/plain")
+    name = ""
+    if GUILD_ID:
+        try:
+            req = urllib.request.Request(
+                f"https://discord.com/api/v10/guilds/{GUILD_ID}/members/{did}",
+                headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=8) as x:
+                m = json.loads(x.read().decode())
+            name = m.get("nick") or (m.get("user") or {}).get("global_name")                    or (m.get("user") or {}).get("username") or ""
+        except Exception:
+            name = ""
+    if not name:
+        try:
+            req = urllib.request.Request(
+                f"https://discord.com/api/v10/users/{did}",
+                headers={"Authorization": f"Bot {BOT_TOKEN}", "User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=8) as x:
+                u = json.loads(x.read().decode())
+            name = u.get("username") or u.get("global_name") or did
+        except Exception:
+            name = did
+    return Response(content=name.encode(), media_type="text/plain")
 
 @app.get("/api/whoami")
 async def whoami(did: str = ""):
